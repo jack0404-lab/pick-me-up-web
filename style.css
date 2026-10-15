@@ -52,9 +52,10 @@ body {
 .dots { display: flex; gap: 5px; justify-content: center; margin-top: 2px; }
 .dots i { width: 7px; height: 7px; background: var(--ink); }
 .corner-box {
-  justify-self: end; font-size: 11px; padding: 6px 8px;
-  border: 2px dashed var(--ink-2); color: var(--ink-2);
+  justify-self: end; font-family: inherit; font-size: 12px; font-weight: 700; padding: 6px 8px;
+  background: transparent; border: 2px dashed var(--ink); color: var(--ink);
 }
+.corner-box:active { background: var(--ink); color: var(--face-hi); }
 
 /* ----- 패널 (탭 아래 큰 틀) ----- */
 .panel { max-width: 560px; margin: 4px auto 0; padding: 0 12px; }
@@ -173,6 +174,8 @@ input:focus, select:focus, textarea:focus { outline: 2px dashed var(--ink); outl
 }
 .horse-del { font-family: inherit; font-size: 16px; font-weight: 700; color: var(--warn); background: none; border: 2px solid var(--warn); height: 32px; }
 .horse-meta { font-size: 11px; color: var(--ink-2); margin: -2px 0 6px 54px; }
+.auto-badge { display: inline-block; font-size: 10px; padding: 0 4px; margin-right: 4px; background: var(--ink-2); color: var(--face-hi); }
+#btnAutoAnalyze { margin: 0 0 8px; }
 .horse-inputs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .horse-inputs label span { font-size: 10px; color: var(--ink-2); display: block; }
 .horse-inputs input, .horse-inputs select { padding: 5px 5px; font-size: 12px; }
@@ -284,3 +287,27 @@ input:focus, select:focus, textarea:focus { outline: 2px dashed var(--ink); outl
   .horse-inputs { grid-template-columns: repeat(2, 1fr); }
   .bet-grid { grid-template-columns: 1fr; }
 }
+
+/* ----- 설명서 창 ----- */
+.guide-card { width: 100%; max-width: 440px; max-height: 86vh; display: flex; flex-direction: column; }
+.guide-body { overflow-y: auto; font-size: 12px; border-top: 2px dashed var(--ink-2); border-bottom: 2px dashed var(--ink-2); padding: 4px 2px 10px; margin-bottom: 4px; }
+.guide-body h3 { font-size: 13px; margin: 12px 0 4px; padding-left: 12px; position: relative; }
+.guide-body h3::before { content: ""; position: absolute; left: 0; top: 5px; width: 7px; height: 7px; background: var(--ink); }
+.guide-body p { margin-bottom: 4px; }
+.guide-body ol, .guide-body ul { padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.guide-body li::before { content: none; }
+.guide-io { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.guide-io > div { border: 2px solid var(--ink); background: var(--face); padding: 6px 8px; }
+.guide-io ul { margin-top: 4px; }
+.guide-body ul, .guide-body ol { border: 0; margin: 0; padding: 0 0 0 18px; gap: 2px; }
+.guide-body ul { list-style: square; }
+.guide-body ol { list-style: decimal; }
+
+/* ----- 조합 우선순위 ----- */
+.rank-row { display: flex; justify-content: space-between; align-items: center; gap: 4px; margin-bottom: 2px; }
+.rank-badge { font-size: 11px; font-weight: 700; padding: 0 5px; border: 2px solid var(--ink); background: var(--face-hi); }
+.bet.top .rank-badge { background: var(--ink); color: var(--face-hi); }
+.track-safe .bet.top { box-shadow: 0 5px 0 var(--safe); }
+.track-dark .bet.top { box-shadow: 0 5px 0 var(--dark); }
+.rank-metric { font-size: 10px; color: var(--ink-2); text-align: right; }
+.rank-note { font-size: 11px; color: var(--ink-2); margin-top: 6px; }

@@ -2,7 +2,7 @@
  * app.js — 화면 동작, 저장, 사진 판독, 공공데이터 연동
  * ========================================================= */
 
-const APP_VERSION = "0.1.0 (개인용 검증판)";
+const APP_VERSION = "0.2.0 (개인용 검증판)";
 
 /* ---------------------------------------------------------
  * 공공데이터 API 설정 — ★ 필드명·파라미터명은 추정값 ★
@@ -14,11 +14,14 @@ const KRA = {
   entry: { path: "/API26_2/entrySheet_2" },                   // 출전표 상세정보
   result: { path: "/API4_3/raceResult_3" },                   // 경주기록 정보
   dateParam: "rc_date",                                       // 경주일자 파라미터 (YYYYMMDD) — 추정
+  monthParam: "rc_month",                                     // 경주년월 파라미터 (YYYYMM) — 추정
+  historyMonths: 3,                                           // 자동 분석에 쓸 과거 기록 기간 (개월)
   fields: {                                                   // 응답 필드 후보 (앞에서부터 찾음)
     rcDate: ["rcDate", "rc_date"],
     rcNo: ["rcNo", "rc_no"],
     chulNo: ["chulNo", "chul_no", "gateNo"],
     hrName: ["hrName", "hr_name", "hrNm"],
+    hrNo: ["hrNo", "hr_no"],
     jkName: ["jkName", "jk_name", "jkNm"],
     weight: ["wgBudam", "wg_budam", "budam"],
     ord: ["ord", "rank", "rcOrd"],
@@ -172,7 +175,7 @@ function renderHorses() {
         <input class="name" type="text" value="${esc(h.name)}" placeholder="마명" data-f="name" />
         <button class="horse-del" data-act="del" aria-label="삭제">×</button>
       </div>
-      ${h.jockey || h.weight ? `<div class="horse-meta">${esc(h.jockey)}${h.weight ? ` · ${h.weight}kg` : ""}</div>` : ""}
+      ${h.jockey || h.weight || h.note ? `<div class="horse-meta">${h.auto ? `<span class="auto-badge">자동</span>` : ""}${esc([h.jockey, h.weight ? h.weight + "kg" : "", h.note].filter(Boolean).join(" · "))}</div>` : ""}
       <div class="horse-inputs">
         <label><span>단승</span><input type="number" step="0.1" inputmode="decimal" value="${h.winOdds || ""}" data-f="winOdds" /></label>
         <label><span>연승</span><input type="number" step="0.1" inputmode="decimal" value="${h.placeOdds || ""}" data-f="placeOdds" /></label>
@@ -191,6 +194,7 @@ $("horseList").addEventListener("input", e => {
   if (!box || !f || f === "num") return;                       // 마번은 change 에서 처리
   const h = current.horses[box.dataset.i];
   h[f] = (f === "winOdds" || f === "placeOdds") ? toNum(e.target.value, 0) : e.target.value;
+  if (f === "mark" || f === "style") h.sheet = true;             // 직접 고친 평점·습성은 보호
   saveCurrent();
   recalc();                                                    // 목록은 다시 그리지 않아 입력 포커스 유지
 });
@@ -211,6 +215,7 @@ $("horseList").addEventListener("click", e => {
   } else if (e.target.dataset.tag) {
     const t = e.target.dataset.tag;
     h.tags = h.tags.includes(t) ? h.tags.filter(x => x !== t) : [...h.tags, t];
+    h.sheet = true;                                              // 직접 고친 태그는 보호
   } else return;
   saveCurrent();
   renderHorses();
@@ -223,7 +228,7 @@ $("btnAddHorse").onclick = () => {
   saveCurrent(); renderHorses(); recalc();
 };
 $("btnSample").onclick = () => {
-  current.horses = SAMPLE.map(normalizeHorse);
+  current.horses = SAMPLE.map(x => normalizeHorse({ ...x, sheet: true }));
   current.actualQ = {}; current.actualQP = {};
   saveCurrent(); renderHorses(); recalc();
 };
@@ -279,7 +284,11 @@ function renderBriefing(r) {
 const TYPE_DESC = { "단승": "1착", "연승": "3착 이내", "복승": "1·2착 순서무관", "복연승": "둘 다 3착 이내" };
 
 function renderBets(gridId, picks) {
-  $(gridId).innerHTML = picks.map(p => {
+  // 순위가 있는 조합을 1순위부터, 조건 미충족 칸은 맨 뒤로
+  const ordered = [...picks].sort((a, b) => (a.rank || 99) - (b.rank || 99));
+  const placeN = lastResult && lastResult.scored.length <= 7 ? 2 : 3;      // 7두 이하는 2착까지 입상
+  const desc = t => (t === "연승" ? `${placeN}착 이내` : t === "복연승" ? `둘 다 ${placeN}착 이내` : TYPE_DESC[t]);
+  $(gridId).innerHTML = ordered.map(p => {
     if (!p.nums.length) {
       return `<div class="bet none"><div class="bet-type"><span>${p.type}</span></div>
         <div class="bet-main">조건 충족 조합 없음</div></div>`;
@@ -287,8 +296,12 @@ function renderBets(gridId, picks) {
     const isPair = p.nums.length === 2;
     const key = isPair ? pairKey(p.nums[0], p.nums[1]) : "";
     const kind = p.type === "복승" ? "q" : "qp";
-    return `<div class="bet">
-      <div class="bet-type"><span>${p.type} <small>${TYPE_DESC[p.type]}</small></span>
+    const metric = p.track === "안정형"
+      ? `적중 추정 ${(p.prob * 100).toFixed(0)}%`
+      : `기대 지수 ${p.ev.toFixed(2)} · 적중 ${(p.prob * 100).toFixed(0)}%`;
+    return `<div class="bet ${p.rank === 1 ? "top" : ""}">
+      <div class="rank-row"><span class="rank-badge">${p.rank}순위</span><span class="rank-metric">${metric}</span></div>
+      <div class="bet-type"><span>${p.type} <small>${desc(p.type)}</small></span>
         <span class="bet-odds">${p.odds.toFixed(1)}배${p.est ? `<span class="est-badge">추정</span>` : ""}</span></div>
       <div class="bet-main">${p.nums.join(" - ")}번</div>
       ${isPair ? `<div class="actual-input"><span>실제 배당</span>
@@ -331,8 +344,9 @@ function renderStakes(r) {
 $("btnCopy").onclick = async () => {
   if (!lastResult) return;
   const m = current.meta;
-  const line = p => `- ${p.track} ${p.type}: ${p.nums.length ? p.nums.join("-") + "번 (" + p.odds.toFixed(1) + "배" + (p.est ? ", 추정" : "") + ")" : "없음"}`;
-  const text = `[${m.date} ${m.track} ${m.raceNo}경주 참고 조합]\n` + lastResult.picks.map(line).join("\n");
+  const line = p => `- ${p.track} ${p.rank ? p.rank + "순위 " : ""}${p.type}: ${p.nums.length ? p.nums.join("-") + "번 (" + p.odds.toFixed(1) + "배" + (p.est ? ", 추정" : "") + ")" : "없음"}`;
+  const sorted = [...lastResult.picks].sort((a, b) => a.track.localeCompare(b.track) || (a.rank || 99) - (b.rank || 99));
+  const text = `[${m.date} ${m.track} ${m.raceNo}경주 참고 조합]\n` + sorted.map(line).join("\n");
   try { await navigator.clipboard.writeText(text); toast("복사했습니다."); }
   catch { prompt("아래 내용을 길게 눌러 복사하세요.", text); }
 };
@@ -430,9 +444,12 @@ function mergeAiResult(obj) {
     if (!num) return;
     let h = current.horses.find(x => x.num === num);
     if (!h) { h = normalizeHorse({ num }); current.horses.push(h); }
-    const clean = normalizeHorse({ ...h, ...Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== null && v !== "")) });
-    // 태그는 사진에서 읽은 것을 기존 태그에 추가
-    clean.tags = [...new Set([...h.tags, ...clean.tags])];
+    const fromPhoto = Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== null && v !== ""));
+    const hasSheet = ["mark", "style"].some(k => fromPhoto[k]) || (Array.isArray(fromPhoto.tags) && fromPhoto.tags.length > 0);
+    const clean = normalizeHorse({ ...h, ...fromPhoto });
+    // 태그: 정보지에서 읽었으면 자동 분석 태그 대신 사용, 아니면 기존 태그에 추가
+    clean.tags = [...new Set([...(hasSheet && h.auto ? [] : h.tags), ...clean.tags])];
+    if (hasSheet) { clean.sheet = true; clean.auto = false; clean.note = ""; }
     Object.assign(h, clean);
     count++;
   });
@@ -492,18 +509,73 @@ $("btnLoadEntry").onclick = async () => {
       h.name = String(pick(it, f.hrName) ?? h.name);
       h.jockey = String(pick(it, f.jkName) ?? h.jockey);
       h.weight = toNum(pick(it, f.weight), h.weight);
+      h.hrNo = String(pick(it, f.hrNo) ?? h.hrNo ?? "");
     });
     const dist = toNum(pick(race[0], f.dist), 0);
     if (dist) { m.dist = dist; $("raceDist").value = dist; }
     current.horses.sort((a, b) => a.num - b.num);
     saveCurrent(); renderHorses(); recalc();
-    setStatus("entryStatus", `${race.length}두 출전표를 반영했습니다 (새로 추가 ${added}두). 배당·평점은 사진이나 직접 입력으로 채우세요.`, "ok");
+    setStatus("entryStatus", `${race.length}두 출전표를 반영했습니다 (새로 추가 ${added}두).`, "ok");
+    // 정보지 값이 있는 말이 하나도 없으면 공공데이터로 자동 분석
+    if (!current.horses.some(h => h.sheet)) await runAutoAnalysis();
   } catch (err) {
     setStatus("entryStatus", "불러오기 실패: " + err.message, "warn");
   } finally {
     btn.disabled = false;
   }
 };
+
+// 과거 경주기록 불러오기: 최근 1개월(날짜 없이) + 이전 달들 (앱을 켜 둔 동안 기억)
+const historyCache = {};
+async function loadHistory(track) {
+  const meet = KRA.meetCode[track];
+  const key = `${meet}|${today()}`;
+  if (historyCache[key]) return historyCache[key];
+  const months = [];
+  const d = new Date();
+  for (let i = 1; i < KRA.historyMonths; i++) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    months.push(`${m.getFullYear()}${String(m.getMonth() + 1).padStart(2, "0")}`);
+  }
+  const queries = [{ meet }, ...months.map(ym => ({ meet, [KRA.monthParam]: ym }))];
+  const rows = [], seen = new Set(), f = KRA.fields;
+  for (const q of queries) {
+    for (let page = 1; page <= 6; page++) {                    // 한 번에 500건, 최대 3,000건
+      const { items } = await kraFetch(KRA.result.path, { ...q, pageNo: String(page), numOfRows: "500" });
+      items.forEach(it => {
+        const id = [pick(it, f.rcDate), pick(it, f.rcNo), pick(it, f.chulNo), pick(it, f.hrName)].join("|");
+        if (!seen.has(id)) { seen.add(id); rows.push(it); }
+      });
+      if (items.length < 500) break;
+    }
+  }
+  historyCache[key] = rows;
+  return rows;
+}
+
+// 정보지 값이 없는 말을 공공데이터 과거 기록으로 분석
+async function runAutoAnalysis() {
+  const btn = $("btnAutoAnalyze");
+  if (!current.horses.length) { setStatus("autoStatus", "먼저 출전표를 불러오거나 출전마를 입력하세요.", "warn"); return; }
+  btn.disabled = true;
+  setStatus("autoStatus", "과거 경주기록으로 분석하는 중… (처음엔 10~20초)");
+  try {
+    const rows = await loadHistory(current.meta.track);
+    const r = enrichFromHistory(current.horses, rows, KRA.fields, { dist: current.meta.dist });
+    current.horses = r.horses;
+    saveCurrent(); renderHorses(); recalc();
+    const parts = [`기록 ${r.rowCount.toLocaleString()}건으로 ${r.changed}두 자동 분석 (기록 있는 말 ${r.withData}두).`];
+    if (!r.g3fKey) parts.push("구간기록이 없어 종반G3F·주행 습성은 판단하지 못했습니다.");
+    if (r.withData === 0) parts.push("출전마와 이름이 맞는 기록이 없습니다. 연결 테스트 화면을 캡처해 주세요.");
+    parts.push("정보지 사진을 읽으면 그 값이 우선합니다.");
+    setStatus("autoStatus", parts.join(" "), r.withData ? "ok" : "warn");
+  } catch (err) {
+    setStatus("autoStatus", "자동 분석 실패: " + err.message, "warn");
+  } finally {
+    btn.disabled = false;
+  }
+}
+$("btnAutoAnalyze").onclick = runAutoAnalysis;
 
 // 오늘 이후 가장 가까운 금·토·일 3일 (YYYYMMDD)
 function nextRaceDays(count = 3) {
@@ -662,6 +734,13 @@ function renderStats() {
     ["기준선(인기순)", ["b_win", "b_place", "b_qp", "b_q"]]
   ];
   const name = { win: "단승", place: "연승", qp: "복연승", q: "복승" };
+  const rowHtml = (label, gs) => {
+    const n = gs.length, hits = gs.filter(g => g.hit).length;
+    const stake = gs.reduce((s, g) => s + g.stake, 0), pay = gs.reduce((s, g) => s + g.payout, 0);
+    const roi = stake ? pay / stake * 100 : 0;
+    return `<tr><td>${label}</td><td>${n}</td><td>${n ? (hits / n * 100).toFixed(0) + "%" : "-"}</td>
+      <td class="${n ? (roi >= 100 ? "good" : "bad") : ""}">${n ? roi.toFixed(0) + "%" : "-"}</td></tr>`;
+  };
   let html = `<table class="stats-table"><tr><th>승식</th><th>건수</th><th>적중률</th><th>회수율</th></tr>`;
   rows.forEach(([group, ids]) => {
     html += `<tr class="group"><td colspan="4">${group}</td></tr>`;
@@ -672,6 +751,14 @@ function renderStats() {
       const roi = stake ? pay / stake * 100 : 0;
       html += `<tr><td>${name[id.split("_")[1]]}</td><td>${n}</td><td>${n ? (hits / n * 100).toFixed(0) + "%" : "-"}</td>
         <td class="${n ? (roi >= 100 ? "good" : "bad") : ""}">${n ? roi.toFixed(0) + "%" : "-"}</td></tr>`;
+    });
+  });
+  // 순위별: 각 경주에서 같은 순위를 받은 조합끼리 모아 비교
+  html += `<tr class="group"><td colspan="4">순위별 (안정형 / 공격형)</td></tr>`;
+  ["안정형", "공격형"].forEach(track => {
+    [1, 2].forEach(rank => {
+      const gs = graded.map(r => { const p = r.picks.find(x => x.track === track && x.rank === rank); return p && r.grades[p.id]; }).filter(Boolean);
+      html += rowHtml(`${track} ${rank}순위`, gs);
     });
   });
   $("statsBox").innerHTML = html + `</table><p class="fineprint">채점 ${graded.length}경주. 표본이 적을 때(30경주 미만) 수치는 우연의 영향이 큽니다.</p>`;
@@ -737,5 +824,8 @@ function init() {
   recalc();
   if (!store.get(K.agreed, false)) $("introModal").hidden = false;
   $("btnAgree").onclick = () => { store.set(K.agreed, true); $("introModal").hidden = true; };
+  $("btnGuide").onclick = () => { $("guideModal").hidden = false; $("guideModal").querySelector(".guide-body").scrollTop = 0; };
+  $("btnGuideClose").onclick = () => { $("guideModal").hidden = true; };
+  $("guideModal").addEventListener("click", e => { if (e.target.id === "guideModal") $("guideModal").hidden = true; });
 }
 init();
