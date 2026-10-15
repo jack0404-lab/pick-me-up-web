@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <!-- viewport-fit=cover: 안드로이드 전체화면(edge-to-edge)에서 상태바 영역까지 그리고, 여백은 CSS로 처리 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#cfc6aa" />
+  <meta name="robots" content="noindex, nofollow" />                      <!-- 검색엔진 노출 차단 -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />               <!-- 아이폰 홈 화면 설치 -->
+  <meta name="apple-mobile-web-app-title" content="Pick me up" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Pick me up</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon-32.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- 상단 바: 왼쪽 기록 수, 가운데 제목, 오른쪽 개인용 표시 -->
+  <header class="topbar">
+    <div class="counter"><i class="px" data-icon="ticket"></i><span id="recordCount">0</span></div>
+    <div class="title-block">
+      <h1>PICK ME UP</h1>
+      <div class="dots"><i></i><i></i><i></i></div>
+    </div>
+    <div class="corner-box">개인</div>
+  </header>
+
+  <main class="panel">
+    <!-- 폴더형 탭 -->
+    <nav class="folder-tabs">
+      <button class="tab-btn active" data-tab="analyze" aria-label="분석"><i class="px" data-icon="horse"></i><span>분석</span></button>
+      <button class="tab-btn" data-tab="records" aria-label="기록"><i class="px" data-icon="list"></i><span>기록</span></button>
+      <button class="tab-btn" data-tab="settings" aria-label="설정"><i class="px" data-icon="gear"></i><span>설정</span></button>
+    </nav>
+    <div class="panel-title"><h2 id="panelTitle">ANALYZE</h2><p id="raceBadge">경주 미선택</p></div>
+    <!-- ============ 탭 1: 분석 ============ -->
+    <section id="tab-analyze" class="tab active">
+
+      <!-- 경주 정보 -->
+      <div class="card">
+        <div class="card-head"><h2>경주 정보</h2></div>
+        <div class="grid-3">
+          <label class="field"><span>경주일</span><input type="date" id="raceDate" /></label>
+          <label class="field"><span>경마장</span>
+            <select id="track"><option>서울</option><option>부산경남</option><option>제주</option></select>
+          </label>
+          <label class="field"><span>경주</span><input type="number" id="raceNo" min="1" max="20" inputmode="numeric" /></label>
+          <label class="field"><span>거리(m)</span><input type="number" id="raceDist" step="100" inputmode="numeric" /></label>
+          <label class="field span-2"><span>주로 상태</span>
+            <select id="trackCond"><option>건조</option><option>양호</option><option>다습</option><option>포화</option><option>불량</option></select>
+          </label>
+        </div>
+        <button class="btn btn-block" id="btnLoadEntry">출전표 불러오기 (마사회 공공데이터)</button>
+        <div class="status" id="entryStatus"></div>
+      </div>
+
+      <!-- 사진 판독 -->
+      <div class="card">
+        <div class="card-head"><h2>사진 판독</h2><span class="hint">AI가 읽은 값은 꼭 확인하세요</span></div>
+        <div class="photo-grid">
+          <div class="photo-box" data-slot="odds">
+            <img alt="" hidden />
+            <div class="photo-label"><strong>배당판</strong><small>단승·연승·복승·복연승</small></div>
+            <div class="photo-btns">
+              <label class="btn btn-sm">촬영<input type="file" accept="image/*" capture="environment" data-slot="odds" /></label>
+              <label class="btn btn-sm">사진첩<input type="file" accept="image/*" data-slot="odds" /></label>
+            </div>
+          </div>
+          <div class="photo-box" data-slot="sheet">
+            <img alt="" hidden />
+            <div class="photo-label"><strong>정보지</strong><small>평점·전개·특이사항</small></div>
+            <div class="photo-btns">
+              <label class="btn btn-sm">촬영<input type="file" accept="image/*" capture="environment" data-slot="sheet" /></label>
+              <label class="btn btn-sm">사진첩<input type="file" accept="image/*" data-slot="sheet" /></label>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="btnAnalyze">AI로 사진 읽기</button>
+        <div class="status" id="aiStatus"></div>
+      </div>
+
+      <!-- 출전마 입력 -->
+      <div class="card">
+        <div class="card-head">
+          <h2>출전마</h2>
+          <div class="head-actions">
+            <button class="btn btn-sm" id="btnSample">샘플</button>
+            <button class="btn btn-sm" id="btnClear">비우기</button>
+            <button class="btn btn-sm btn-primary" id="btnAddHorse">+ 추가</button>
+          </div>
+        </div>
+        <div id="dupWarning" class="status warn"></div>
+        <div id="horseList" class="horse-list"></div>
+      </div>
+
+      <!-- 브리핑 -->
+      <div class="card">
+        <div class="card-head"><h2>경주 흐름 브리핑</h2></div>
+        <ul id="briefing" class="briefing"></ul>
+      </div>
+
+      <!-- 추천: 안정형 -->
+      <div class="track track-safe">
+        <div class="track-head">
+          <div>
+            <span class="pill pill-green">전략 1 · 안정형</span>
+            <h2><span id="minLabel">2.0</span>배 이상 조건 충족 조합</h2>
+          </div>
+        </div>
+        <div class="bet-grid" id="safeGrid"></div>
+      </div>
+
+      <!-- 추천: 공격형 -->
+      <div class="track track-dark">
+        <div class="track-head">
+          <div>
+            <span class="pill pill-gold">전략 2 · 공격형</span>
+            <h2>복병마 중심 참고 조합</h2>
+          </div>
+        </div>
+        <div class="bet-grid" id="darkGrid"></div>
+      </div>
+
+      <!-- 예산 배분 -->
+      <div class="card">
+        <div class="card-head"><h2>예산 배분</h2><span class="hint">안정형 65 : 공격형 35</span></div>
+        <label class="field inline"><span>이번 경주 예산(원)</span>
+          <input type="number" id="budget" step="1000" inputmode="numeric" />
+        </label>
+        <div id="stakeList" class="stake-list"></div>
+        <p class="fineprint">예상 환급은 입력된 배당 기준 추정치이며 결과를 보장하지 않습니다.</p>
+      </div>
+
+      <div class="action-row">
+        <button class="btn" id="btnCopy">요약 복사</button>
+        <button class="btn btn-primary" id="btnSaveRecord">이 경주 기록하기</button>
+      </div>
+    </section>
+
+    <!-- ============ 탭 2: 기록 ============ -->
+    <section id="tab-records" class="tab">
+      <div class="card">
+        <div class="card-head">
+          <h2>성과 요약</h2>
+          <button class="btn btn-sm btn-primary" id="btnGradeAll">결과 자동 채점</button>
+        </div>
+        <div class="status" id="gradeStatus"></div>
+        <div id="statsBox"></div>
+        <p class="fineprint">승식별로 1,000원씩 가상 투표했다고 가정한 값입니다. 환급은 기록 시점 배당 기준 추정치이며 실제 확정 배당과 다를 수 있습니다. 기준선 = 단순 인기순 선택.</p>
+      </div>
+      <div id="recordList"></div>
+    </section>
+
+    <!-- ============ 탭 3: 설정 ============ -->
+    <section id="tab-settings" class="tab">
+      <div class="card">
+        <div class="card-head"><h2>API 키</h2><span class="hint">이 기기에만 저장됩니다</span></div>
+        <label class="field"><span>Gemini API 키 (사진 판독)</span><input type="password" id="geminiKey" autocomplete="off" /></label>
+        <label class="field"><span>Gemini 모델 이름</span><input type="text" id="geminiModel" autocomplete="off" /></label>
+        <label class="field"><span>공공데이터포털 인증키 (Decoding 키)</span><input type="password" id="dataKey" autocomplete="off" /></label>
+        <button class="btn btn-primary btn-block" id="btnSaveSettings">저장</button>
+        <button class="btn btn-block" id="btnApiTest">공공데이터 연결 테스트</button>
+        <pre class="debug" id="apiTestOut" hidden></pre>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>추천 기준</h2></div>
+        <label class="check"><input type="checkbox" id="strictMin" /> 안정형은 2.0배 이상만 (끄면 1.5배 이상)</label>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>기록 백업</h2></div>
+        <p class="fineprint">앱을 지우거나 브라우저 데이터를 지우면 기록도 지워집니다. 주기적으로 내보내서 메모 앱 등에 보관하세요.</p>
+        <div class="action-row compact">
+          <button class="btn" id="btnExport">내보내기</button>
+          <button class="btn" id="btnImport">가져오기</button>
+        </div>
+        <textarea id="backupBox" class="backup" rows="6" placeholder="내보내기를 누르면 여기에 백업 내용이 나옵니다. 가져올 때는 백업 내용을 붙여넣고 가져오기를 누르세요."></textarea>
+        <button class="btn btn-danger btn-block" id="btnResetAll">모든 기록 삭제</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>안내</h2></div>
+        <p class="fineprint">개인용 경주 분석 참고 도구입니다. 마권 구매·베팅 기능이 없으며, 제시된 조합과 환급 추정치는 결과를 보장하지 않습니다. 마권은 한국마사회 공식 채널에서만 구매할 수 있고 만 21세 이상만 이용할 수 있습니다.</p>
+        <p class="fineprint" id="versionText"></p>
+      </div>
+    </section>
+    <div class="panel-foot"><span class="foot-notch"><i class="px" data-icon="horse"></i></span></div>
+  </main>
+
+  <!-- 첫 실행 안내 -->
+  <div class="modal" id="introModal" hidden>
+    <div class="modal-card">
+      <h2>시작 전에 확인해 주세요</h2>
+      <ul>
+        <li>이 앱은 개인용 분석 참고 도구입니다.</li>
+        <li>추천 조합과 예상 환급은 결과를 보장하지 않습니다.</li>
+        <li>마권 구매는 한국마사회 공식 채널에서만 가능하며, 만 21세 이상만 이용할 수 있습니다.</li>
+        <li>먼저 <strong>기록</strong> 탭으로 가상 투표 성과를 확인한 뒤 판단하는 것을 권장합니다.</li>
+      </ul>
+      <button class="btn btn-primary btn-block" id="btnAgree">확인했습니다 (만 21세 이상)</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="scoring.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
