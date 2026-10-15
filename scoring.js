@@ -293,14 +293,14 @@ function probAllInTop(q, nums, k) {
 
 function rankPicks(picks, scored) {
   if (scored.length < 2) return;
-  const placeN = scored.length <= 7 ? 2 : 3;
+  const placeN = scored.length <= 7 ? 2 : 3;                         // 연승만 출전 두수에 따라 달라짐
   const market = shareOf(scored, h => 1 / h.winOdds);
   const stab = shareOf(scored, h => h.stability);
   const darkTotal = scored.reduce((s, h) => s + h.dark, 0);
   const dark = darkTotal > 0 ? shareOf(scored, h => h.dark) : stab;
   const blend = (a, b) => { const o = {}; Object.keys(a).forEach(k => { o[k] = 0.7 * a[k] + 0.3 * b[k]; }); return o; };
   const modelSafe = blend(market, stab), modelDark = blend(market, dark);
-  const topK = { "단승": 1, "연승": placeN, "복승": 2, "복연승": placeN };
+  const topK = { "단승": 1, "연승": placeN, "복승": 2, "복연승": 3 };   // 복연승은 항상 3착 이내
 
   ["안정형", "공격형"].forEach(track => {
     const model = track === "안정형" ? modelSafe : modelDark;
@@ -316,7 +316,10 @@ function rankPicks(picks, scored) {
 
 /**
  * 채점: top = [1착, 2착, 3착] 마번
- * 연승·복연승 입상 범위: 출전 7두 이하 2착, 8두 이상 3착 (마사회 규정 — 확인 필요)
+ * 한국마사회법 시행규칙 제4조:
+ *   연승   = 출전 8두 이상 3착 이내, 5~7두 2착 이내
+ *   복승   = 1·2착 2마리 (순서 무관)
+ *   복연승 = 출전 두수와 관계없이 1~3착 중 2마리
  */
 function gradePick(pick, top, fieldSize, stake = 1000) {
   if (!pick.nums.length || !top || top.length < 2) return null;  // 추천 없음 또는 결과 없음
@@ -326,7 +329,7 @@ function gradePick(pick, top, fieldSize, stake = 1000) {
   if (pick.type === "단승") hit = pick.nums[0] === top[0];
   if (pick.type === "연승") hit = inPlace(pick.nums[0]);
   if (pick.type === "복승") hit = pick.nums.includes(top[0]) && pick.nums.includes(top[1]);
-  if (pick.type === "복연승") hit = pick.nums.every(inPlace);
+  if (pick.type === "복연승") hit = pick.nums.every(n => top.slice(0, 3).includes(n));   // 항상 3착 이내
   return { hit, stake, payout: hit ? Math.round(stake * pick.odds) : 0 };
 }
 

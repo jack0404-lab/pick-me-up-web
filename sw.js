@@ -1,7 +1,7 @@
 /* 서비스워커 — 웹 버전을 인터넷 없이도 열 수 있게 화면 파일을 저장해 둠
  * 전략: 화면 파일은 "인터넷 먼저, 안 되면 저장본" → 업데이트가 바로 반영됨
  * API 요청(공공데이터·Gemini)은 저장하지 않음 */
-const CACHE = "pick-me-up-v2";
+const CACHE = "pick-me-up-v3";
 const SHELL = [
   "./", "./index.html", "./style.css", "./app.js", "./scoring.js", "./manifest.webmanifest",
   "./fonts/Galmuri11.woff2", "./fonts/Galmuri11-Bold.woff2", "./fonts/Galmuri14.woff2",

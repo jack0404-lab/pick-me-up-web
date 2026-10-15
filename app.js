@@ -2,7 +2,7 @@
  * app.js — 화면 동작, 저장, 사진 판독, 공공데이터 연동
  * ========================================================= */
 
-const APP_VERSION = "0.2.0 (개인용 검증판)";
+const APP_VERSION = "0.2.1 (개인용 검증판)";
 
 /* ---------------------------------------------------------
  * 공공데이터 API 설정 — ★ 필드명·파라미터명은 추정값 ★
@@ -286,8 +286,8 @@ const TYPE_DESC = { "단승": "1착", "연승": "3착 이내", "복승": "1·2�
 function renderBets(gridId, picks) {
   // 순위가 있는 조합을 1순위부터, 조건 미충족 칸은 맨 뒤로
   const ordered = [...picks].sort((a, b) => (a.rank || 99) - (b.rank || 99));
-  const placeN = lastResult && lastResult.scored.length <= 7 ? 2 : 3;      // 7두 이하는 2착까지 입상
-  const desc = t => (t === "연승" ? `${placeN}착 이내` : t === "복연승" ? `둘 다 ${placeN}착 이내` : TYPE_DESC[t]);
+  const placeN = lastResult && lastResult.scored.length <= 7 ? 2 : 3;      // 연승: 7두 이하는 2착까지
+  const desc = t => (t === "연승" ? `${placeN}착 이내` : TYPE_DESC[t]);      // 복연승은 항상 3착 이내
   $(gridId).innerHTML = ordered.map(p => {
     if (!p.nums.length) {
       return `<div class="bet none"><div class="bet-type"><span>${p.type}</span></div>
